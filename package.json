@@ -1,0 +1,52 @@
+{
+  "name": "@ridhof_1/optiguard-security",
+  "version": "1.0.3",
+  "description": "Enterprise-grade frontend security shield: Anti-DevTools, Anti-Debugger, Context Menu & Shortcut Blocker with customizable Lock Screen for Web & SPA applications.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "security",
+    "anti-inspect",
+    "devtools-detector",
+    "anti-debugging",
+    "protect-source",
+    "lockscreen",
+    "spa-security",
+    "optiguard"
+  ],
+  "author": "PT Tata Optima Property",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ridho-f/optiguard-security.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ridho-f/optiguard-security/issues"
+  },
+  "homepage": "https://github.com/ridho-f/optiguard-security#readme",
+  "dependencies": {
+    "devtools-detector": "^2.0.25"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3"
+  }
+}
