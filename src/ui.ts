@@ -46,11 +46,11 @@ export function renderLockScreen(config: SecurityConfig = {}): void {
   const buttonText = branding.buttonText || 'Kembali ke Portal Login';
   const buttonUrl = branding.buttonUrl || config.redirectUrl || '/login';
 
-  // Exact OptiGuard.png image embedded directly into package
+  // Embedded OptiGuard Logo (Base64)
   let logoHtml = '';
   if (typeof logoUrl === 'string' && logoUrl.trim().length > 0) {
     logoHtml = `<img src="${logoUrl}" alt="OptiGuard Logo" class="optiguard-logo" onerror="this.style.display='none'" />`;
-  } else if (logoUrl !== null && logoUrl !== false) {
+  } else if (logoUrl !== false) {
     logoHtml = `<img src="${DEFAULT_OPTIGUARD_LOGO}" alt="OptiGuard Logo" class="optiguard-logo" />`;
   }
 
