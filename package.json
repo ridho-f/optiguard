@@ -1,12 +1,17 @@
 {
   "name": "@ridhof_1/optiguard-security",
-  "version": "1.0.3",
-  "description": "Enterprise-grade frontend security shield: Anti-DevTools, Anti-Debugger, Context Menu & Shortcut Blocker with customizable Lock Screen for Web & SPA applications.",
+  "version": "1.1.0",
+  "description": "Enterprise-grade frontend security shield: Anti-DevTools, Anti-Debugger, Forensic Watermark, Privacy Shield, Inactivity Auto-Lock, Anti-Print & Shortcuts Blocker for Web & SPA applications.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./react": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
@@ -28,6 +33,10 @@
     "devtools-detector",
     "anti-debugging",
     "protect-source",
+    "watermark",
+    "privacy-screen",
+    "idle-lock",
+    "anti-print",
     "lockscreen",
     "spa-security",
     "optiguard"
@@ -36,16 +45,26 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ridho-f/optiguard-security.git"
+    "url": "git+https://github.com/ridho-f/optiguard.git"
   },
   "bugs": {
-    "url": "https://github.com/ridho-f/optiguard-security/issues"
+    "url": "https://github.com/ridho-f/optiguard/issues"
   },
-  "homepage": "https://github.com/ridho-f/optiguard-security#readme",
+  "homepage": "https://github.com/ridho-f/optiguard#readme",
   "dependencies": {
     "devtools-detector": "^2.0.25"
   },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@types/react": "^18.0.28",
+    "react": "^18.2.0",
     "tsup": "^8.3.6",
     "typescript": "^5.7.3"
   }

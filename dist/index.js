@@ -3,6 +3,8 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 
 var devtoolsDetector = require('devtools-detector');
+var react = require('react');
+var jsxRuntime = require('react/jsx-runtime');
 
 var _documentCurrentScript = typeof document !== 'undefined' ? document.currentScript : null;
 function _interopNamespace(e) {
@@ -269,6 +271,122 @@ function renderLockScreen(config = {}) {
   }
 }
 
+// src/storage.ts
+function wipeStorage(options) {
+  if (typeof window === "undefined") return;
+  const config = typeof options === "object" && options !== null ? options : { localStorage: true, sessionStorage: true };
+  try {
+    if (config.keys && config.keys.length > 0) {
+      config.keys.forEach((key) => {
+        try {
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        } catch {
+        }
+      });
+    } else {
+      if (config.localStorage !== false) {
+        localStorage.clear();
+      }
+      if (config.sessionStorage !== false) {
+        sessionStorage.clear();
+      }
+    }
+  } catch {
+  }
+  if (config.cookies && typeof document !== "undefined") {
+    try {
+      if (Array.isArray(config.cookies)) {
+        config.cookies.forEach((cookieName) => {
+          document.cookie = `${cookieName}=; Max-Age=0; path=/; domain=${window.location.hostname}`;
+          document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        });
+      } else if (config.cookies === true) {
+        const cookies = document.cookie.split(";");
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i];
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          document.cookie = `${name}=; Max-Age=0; path=/; domain=${window.location.hostname}`;
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+        }
+      }
+    } catch {
+    }
+  }
+}
+
+// src/telemetry.ts
+function setupTelemetry(options) {
+  const config = typeof options === "string" ? { endpoint: options } : typeof options === "object" && options !== null ? options : {};
+  let lastSentMap = {};
+  const report = (partialIncident) => {
+    if (typeof window === "undefined") return;
+    const fullIncident = {
+      ...partialIncident,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      url: window.location.href,
+      userAgent: navigator.userAgent
+    };
+    try {
+      const customEvent = new CustomEvent("optiguard:incident", {
+        detail: fullIncident
+      });
+      window.dispatchEvent(customEvent);
+    } catch {
+    }
+    if (typeof config.onIncident === "function") {
+      try {
+        config.onIncident(fullIncident);
+      } catch {
+      }
+    }
+    if (config.endpoint) {
+      const now = Date.now();
+      const lastSent = lastSentMap[fullIncident.type] || 0;
+      if (now - lastSent < 2e3) {
+        return;
+      }
+      lastSentMap[fullIncident.type] = now;
+      let extraMeta = {};
+      if (typeof config.metadata === "function") {
+        try {
+          extraMeta = config.metadata();
+        } catch {
+        }
+      } else if (typeof config.metadata === "object" && config.metadata !== null) {
+        extraMeta = config.metadata;
+      }
+      const payload = JSON.stringify({
+        ...fullIncident,
+        metadata: extraMeta
+      });
+      if (navigator.sendBeacon) {
+        try {
+          const blob = new Blob([payload], { type: "application/json" });
+          navigator.sendBeacon(config.endpoint, blob);
+          return;
+        } catch {
+        }
+      }
+      try {
+        fetch(config.endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...config.headers || {}
+          },
+          body: payload,
+          keepalive: true
+        }).catch(() => {
+        });
+      } catch {
+      }
+    }
+  };
+  return { report };
+}
+
 // src/detector.ts
 function isLocalEnvironment() {
   if (typeof window === "undefined") return false;
@@ -287,9 +405,14 @@ function setupSecurityDetector(config = {}) {
   let isTriggered = false;
   let intervalId = null;
   const eventCleanups = [];
+  const telemetry = setupTelemetry(config.telemetry);
   const triggerAction = (reason = "devtools_detected") => {
     if (isTriggered) return;
     isTriggered = true;
+    telemetry.report({
+      type: "devtools_opened",
+      reason
+    });
     if (typeof config.onDetect === "function") {
       const shouldContinue = config.onDetect({ reason });
       if (shouldContinue === false) {
@@ -300,10 +423,14 @@ function setupSecurityDetector(config = {}) {
       devtoolsDetector__namespace.stop();
     } catch {
     }
-    try {
-      localStorage.removeItem("portal_notifications");
-      localStorage.removeItem("portal_notif_user_id");
-    } catch {
+    if (config.wipeStorageOnDetect) {
+      wipeStorage(config.wipeStorageOnDetect);
+    } else {
+      try {
+        localStorage.removeItem("portal_notifications");
+        localStorage.removeItem("portal_notif_user_id");
+      } catch {
+      }
     }
     const redirectBehavior = config.redirectBehavior || "logout";
     if (redirectBehavior === "logout") {
@@ -474,10 +601,18 @@ function setupShortcutsBlocker(options) {
   if (typeof document === "undefined") return () => {
   };
   const cleanups = [];
+  const content = options.contentProtection || {};
   if (options.blockContextMenu) {
     const handleContextMenu = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA") && !content.blockCopy) {
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
+      if (options.onBlocked) {
+        options.onBlocked("contextmenu_blocked", { x: e.clientX, y: e.clientY });
+      }
       return false;
     };
     document.addEventListener("contextmenu", handleContextMenu, {
@@ -499,12 +634,77 @@ function setupShortcutsBlocker(options) {
       if (isF12 || isInspect || isViewSource || isSave) {
         e.preventDefault();
         e.stopPropagation();
+        if (options.onBlocked) {
+          options.onBlocked("shortcut_blocked", { key: e.key, code: e.code });
+        }
         return false;
       }
     };
     document.addEventListener("keydown", handleKeyDown, { capture: true });
     cleanups.push(() => {
       document.removeEventListener("keydown", handleKeyDown, { capture: true });
+    });
+  }
+  if (content.blockCopy) {
+    const handleCopy = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (options.onBlocked) {
+        options.onBlocked("copy_blocked");
+      }
+      return false;
+    };
+    document.addEventListener("copy", handleCopy, { capture: true });
+    cleanups.push(() => {
+      document.removeEventListener("copy", handleCopy, { capture: true });
+    });
+  }
+  if (content.blockCut) {
+    const handleCut = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+    document.addEventListener("cut", handleCut, { capture: true });
+    cleanups.push(() => {
+      document.removeEventListener("cut", handleCut, { capture: true });
+    });
+  }
+  if (content.blockDragDrop) {
+    const handleDragStart = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+    document.addEventListener("dragstart", handleDragStart, { capture: true });
+    cleanups.push(() => {
+      document.removeEventListener("dragstart", handleDragStart, {
+        capture: true
+      });
+    });
+  }
+  if (content.blockTextSelection) {
+    const style = document.createElement("style");
+    style.id = "optiguard-selection-styles";
+    style.textContent = `
+      body, body * {
+        -webkit-user-select: none !important;
+        -moz-user-select: none !important;
+        -ms-user-select: none !important;
+        user-select: none !important;
+      }
+      input, textarea {
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        user-select: text !important;
+      }
+    `;
+    document.head.appendChild(style);
+    cleanups.push(() => {
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
     });
   }
   return () => {
@@ -517,8 +717,612 @@ function setupShortcutsBlocker(options) {
   };
 }
 
+// src/watermark.ts
+function setupWatermark(options) {
+  if (typeof document === "undefined" || !options) return null;
+  let currentConfig = typeof options === "boolean" ? { text: "CONFIDENTIAL \u2022 PROTECTED" } : { ...options };
+  let containerEl = null;
+  let watermarkEl = null;
+  let observer = null;
+  let isDestroyed = false;
+  const getContainer = () => {
+    if (typeof currentConfig.container === "string") {
+      const el = document.querySelector(
+        currentConfig.container
+      );
+      if (el) return el;
+    } else if (currentConfig.container instanceof HTMLElement) {
+      return currentConfig.container;
+    }
+    return document.body;
+  };
+  const generateDataUrl = () => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return "";
+    const fontSize = currentConfig.fontSize || 14;
+    const fontFamily = currentConfig.fontFamily || "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+    const color = currentConfig.color || "rgba(0, 0, 0, 0.08)";
+    const rotate = currentConfig.rotate !== void 0 ? currentConfig.rotate : -25;
+    const [gapX, gapY] = currentConfig.gap || [220, 120];
+    let rawText = currentConfig.text;
+    if (typeof rawText === "function") {
+      rawText = rawText();
+    }
+    let lines = Array.isArray(rawText) ? rawText : [rawText || ""];
+    if (currentConfig.appendTimestamp) {
+      const now = /* @__PURE__ */ new Date();
+      const pad = (n) => n.toString().padStart(2, "0");
+      const timestampStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+        now.getDate()
+      )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
+        now.getSeconds()
+      )}`;
+      lines = [...lines, timestampStr];
+    }
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    let maxLineWidth = 0;
+    lines.forEach((line) => {
+      const m = ctx.measureText(line);
+      if (m.width > maxLineWidth) maxLineWidth = m.width;
+    });
+    const lineHeight = fontSize * 1.4;
+    const blockHeight = lines.length * lineHeight;
+    const width = Math.max(maxLineWidth + gapX, 260);
+    const height = Math.max(blockHeight + gapY, 160);
+    canvas.width = width;
+    canvas.height = height;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
+    ctx.fillStyle = color;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(rotate * Math.PI / 180);
+    const startY = -((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, idx) => {
+      ctx.fillText(line, 0, startY + idx * lineHeight);
+    });
+    ctx.restore();
+    return canvas.toDataURL("image/png");
+  };
+  const createWatermarkElement = () => {
+    const el = document.createElement("div");
+    el.setAttribute("data-optiguard-watermark", "true");
+    el.id = "optiguard-watermark-overlay";
+    const bgUrl = generateDataUrl();
+    const opacity = currentConfig.opacity !== void 0 ? currentConfig.opacity : 0.85;
+    const zIndex = currentConfig.zIndex !== void 0 ? currentConfig.zIndex : 9999;
+    el.style.cssText = `
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      pointer-events: none !important;
+      user-select: none !important;
+      -webkit-user-select: none !important;
+      z-index: ${zIndex} !important;
+      opacity: ${opacity} !important;
+      background-repeat: repeat !important;
+      background-image: url(${bgUrl}) !important;
+      display: block !important;
+      visibility: visible !important;
+    `;
+    return el;
+  };
+  const attach = () => {
+    if (isDestroyed) return;
+    containerEl = getContainer();
+    if (!containerEl) return;
+    const existing = document.getElementById("optiguard-watermark-overlay");
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+    watermarkEl = createWatermarkElement();
+    containerEl.appendChild(watermarkEl);
+    if (currentConfig.antiTamper !== false && typeof MutationObserver !== "undefined") {
+      if (observer) observer.disconnect();
+      observer = new MutationObserver((mutations) => {
+        if (isDestroyed) return;
+        let needsReattach = false;
+        for (const mutation of mutations) {
+          if (mutation.type === "childList") {
+            for (let i = 0; i < mutation.removedNodes.length; i++) {
+              const node = mutation.removedNodes[i];
+              if (node === watermarkEl || node.id === "optiguard-watermark-overlay") {
+                needsReattach = true;
+                break;
+              }
+            }
+          }
+          if (mutation.type === "attributes" && mutation.target === watermarkEl) {
+            needsReattach = true;
+            break;
+          }
+        }
+        if (needsReattach && !isDestroyed) {
+          if (observer) observer.disconnect();
+          attach();
+        }
+      });
+      observer.observe(containerEl, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "class", "hidden", "id"]
+      });
+    }
+  };
+  attach();
+  return {
+    destroy: () => {
+      isDestroyed = true;
+      if (observer) {
+        observer.disconnect();
+        observer = null;
+      }
+      if (watermarkEl && watermarkEl.parentNode) {
+        watermarkEl.parentNode.removeChild(watermarkEl);
+      }
+      watermarkEl = null;
+    },
+    update: (newConfig) => {
+      currentConfig = { ...currentConfig, ...newConfig };
+      attach();
+    }
+  };
+}
+
+// src/privacy.ts
+function setupPrivacyBlur(options) {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return null;
+  }
+  const isEnabled = typeof options === "boolean" ? options : options?.enabled !== void 0 ? options.enabled : true;
+  if (!isEnabled) return null;
+  const config = typeof options === "object" && options !== null ? options : {};
+  const blurAmount = config.blurAmount || "16px";
+  const overlayTitle = config.overlayTitle || "OptiGuard Privacy Shield";
+  const overlaySubtitle = config.overlaySubtitle || "Tampilan disembunyikan untuk melindungi kerahasiaan data.";
+  const unblurOnFocus = config.unblurOnFocus !== void 0 ? config.unblurOnFocus : true;
+  let overlayEl = null;
+  let isDestroyed = false;
+  const injectStyles = () => {
+    if (document.getElementById("optiguard-privacy-styles")) return;
+    const style = document.createElement("style");
+    style.id = "optiguard-privacy-styles";
+    style.textContent = `
+      body.optiguard-privacy-active > *:not(#optiguard-privacy-overlay):not(#optiguard-lockscreen):not(#optiguard-watermark-overlay) {
+        filter: blur(${blurAmount}) saturate(0.6) !important;
+        transition: filter 0.15s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        user-select: none !important;
+        pointer-events: none !important;
+      }
+      #optiguard-privacy-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 99998 !important;
+        background: rgba(10, 15, 29, 0.72) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif !important;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease !important;
+      }
+      #optiguard-privacy-overlay.active {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+      }
+      #optiguard-privacy-overlay .privacy-card {
+        background: rgba(17, 24, 39, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(59, 130, 246, 0.15);
+        border-radius: 20px;
+        padding: 32px 40px;
+        text-align: center;
+        max-width: 440px;
+        color: #f8fafc;
+        transform: translateY(8px);
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      #optiguard-privacy-overlay.active .privacy-card {
+        transform: translateY(0);
+      }
+      #optiguard-privacy-overlay .shield-icon {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 16px;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2));
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #60a5fa;
+      }
+      #optiguard-privacy-overlay h3 {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      #optiguard-privacy-overlay p {
+        margin: 0 0 16px;
+        font-size: 13.5px;
+        color: #94a3b8;
+        line-height: 1.5;
+      }
+      #optiguard-privacy-overlay .hint {
+        font-size: 12px;
+        font-weight: 600;
+        color: #38bdf8;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(56, 189, 248, 0.1);
+        padding: 6px 14px;
+        border-radius: 9999px;
+      }
+    `;
+    document.head.appendChild(style);
+  };
+  const createOverlay = () => {
+    if (overlayEl) return;
+    overlayEl = document.createElement("div");
+    overlayEl.id = "optiguard-privacy-overlay";
+    overlayEl.innerHTML = `
+      <div class="privacy-card">
+        <div class="shield-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <rect x="9" y="8" width="6" height="4" rx="1"/>
+          </svg>
+        </div>
+        <h3>${overlayTitle}</h3>
+        <p>${overlaySubtitle}</p>
+        <div class="hint">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 16v-4"/>
+            <path d="M12 8h.01"/>
+          </svg>
+          Klik di mana saja atau fokus ke tab untuk membuka kembali
+        </div>
+      </div>
+    `;
+    overlayEl.addEventListener("click", () => {
+      if (unblurOnFocus) {
+        setBlur(false);
+      }
+    });
+    document.body.appendChild(overlayEl);
+  };
+  const setBlur = (blur) => {
+    if (isDestroyed) return;
+    if (blur) {
+      document.body.classList.add("optiguard-privacy-active");
+      if (overlayEl) overlayEl.classList.add("active");
+    } else {
+      document.body.classList.remove("optiguard-privacy-active");
+      if (overlayEl) overlayEl.classList.remove("active");
+    }
+  };
+  injectStyles();
+  createOverlay();
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      setBlur(true);
+    } else if (document.visibilityState === "visible" && unblurOnFocus) {
+      setBlur(false);
+    }
+  };
+  const handleWindowBlur = () => {
+    setBlur(true);
+  };
+  const handleWindowFocus = () => {
+    if (unblurOnFocus) {
+      setBlur(false);
+    }
+  };
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  window.addEventListener("blur", handleWindowBlur);
+  window.addEventListener("focus", handleWindowFocus);
+  return {
+    destroy: () => {
+      isDestroyed = true;
+      setBlur(false);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+      if (overlayEl && overlayEl.parentNode) {
+        overlayEl.parentNode.removeChild(overlayEl);
+      }
+      const style = document.getElementById("optiguard-privacy-styles");
+      if (style && style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+      overlayEl = null;
+    },
+    setBlur
+  };
+}
+
+// src/idle.ts
+function setupIdleLock(options, parentConfig = {}) {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return null;
+  }
+  const isEnabled = typeof options === "boolean" ? options : options?.enabled !== void 0 ? options.enabled : true;
+  if (!isEnabled) return null;
+  const config = typeof options === "object" && options !== null ? options : {};
+  const timeoutMs = config.timeout || 5 * 60 * 1e3;
+  const warnBeforeSeconds = config.warnBeforeSeconds || 30;
+  const warnMs = Math.max(timeoutMs - warnBeforeSeconds * 1e3, 0);
+  let idleTimer = null;
+  let warnTimer = null;
+  let isDestroyed = false;
+  let isLocked = false;
+  const triggerLock = () => {
+    if (isDestroyed || isLocked) return;
+    isLocked = true;
+    clearTimers();
+    if (typeof config.action === "function") {
+      config.action({ resetTimer, triggerLock });
+      return;
+    }
+    const action = config.action || "lockscreen";
+    if (action === "lockscreen") {
+      renderLockScreen({
+        ...parentConfig,
+        branding: {
+          title: "Sesi Terkunci Karena Tidak Aktif",
+          message: "Aplikasi telah dikunci secara otomatis demi keamanan karena tidak ada aktivitas pengguna dalam beberapa menit.",
+          badgeText: "Inactivity Auto-Lock Protocol",
+          buttonText: "Masuk Kembali",
+          ...parentConfig.branding || {}
+        }
+      });
+    } else if (action === "logout") {
+      renderLockScreen({
+        ...parentConfig,
+        branding: {
+          title: "Sesi Berakhir (Inactivity)",
+          message: "Sesi login Anda telah kedaluwarsa karena tidak aktif.",
+          buttonText: "Login Kembali",
+          ...parentConfig.branding || {}
+        }
+      });
+      try {
+        const csrfToken = document.querySelector(
+          'meta[name="csrf-token"]'
+        )?.content || "";
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "/logout";
+        const csrfInput = document.createElement("input");
+        csrfInput.type = "hidden";
+        csrfInput.name = "_token";
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        document.body.appendChild(form);
+        form.submit();
+      } catch {
+        window.location.replace(parentConfig.redirectUrl || "/login");
+      }
+    } else if (action === "redirect") {
+      window.location.replace(parentConfig.redirectUrl || "/login");
+    }
+  };
+  const clearTimers = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (warnTimer) clearTimeout(warnTimer);
+    idleTimer = null;
+    warnTimer = null;
+  };
+  const resetTimer = () => {
+    if (isDestroyed || isLocked) return;
+    clearTimers();
+    if (config.onWarning && warnMs > 0) {
+      warnTimer = setTimeout(() => {
+        if (!isLocked && !isDestroyed && config.onWarning) {
+          config.onWarning(warnBeforeSeconds);
+        }
+      }, warnMs);
+    }
+    idleTimer = setTimeout(() => {
+      triggerLock();
+    }, timeoutMs);
+  };
+  let lastActivity = 0;
+  const handleActivity = () => {
+    const now = Date.now();
+    if (now - lastActivity > 1e3) {
+      lastActivity = now;
+      resetTimer();
+    }
+  };
+  const events = [
+    "mousemove",
+    "mousedown",
+    "keydown",
+    "touchstart",
+    "touchmove",
+    "scroll",
+    "wheel"
+  ];
+  events.forEach((evt) => {
+    window.addEventListener(evt, handleActivity, { passive: true });
+  });
+  resetTimer();
+  return {
+    destroy: () => {
+      isDestroyed = true;
+      clearTimers();
+      events.forEach((evt) => {
+        window.removeEventListener(evt, handleActivity);
+      });
+    },
+    resetTimer,
+    triggerLock
+  };
+}
+
+// src/print.ts
+function setupPrintBlocker(options, onPrintAttempt) {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return null;
+  }
+  const isEnabled = typeof options === "boolean" ? options : options?.enabled !== void 0 ? options.enabled : true;
+  if (!isEnabled) return null;
+  const config = typeof options === "object" && options !== null ? options : {};
+  const hideContent = config.hideContent !== void 0 ? config.hideContent : true;
+  const printMessage = config.printMessage || "DOKUMEN DILINDUNGI: Mencetak atau menyimpan halaman ini dilarang oleh OptiGuard Security Policy.";
+  let styleEl = null;
+  const injectPrintStyles = () => {
+    if (document.getElementById("optiguard-print-styles")) return;
+    styleEl = document.createElement("style");
+    styleEl.id = "optiguard-print-styles";
+    if (hideContent) {
+      styleEl.textContent = `
+        @media print {
+          html, body {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            overflow: hidden !important;
+          }
+          body::after {
+            display: block !important;
+            visibility: visible !important;
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            font-family: sans-serif !important;
+            font-size: 20pt !important;
+            font-weight: bold !important;
+            color: #dc2626 !important;
+            text-align: center !important;
+            content: "${printMessage}" !important;
+          }
+        }
+      `;
+    }
+    document.head.appendChild(styleEl);
+  };
+  const handleKeyDown = (e) => {
+    const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+    if (isCtrlOrCmd && (e.key === "p" || e.key === "P" || e.keyCode === 80)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onPrintAttempt) onPrintAttempt();
+      return false;
+    }
+  };
+  const handleBeforePrint = () => {
+    if (onPrintAttempt) onPrintAttempt();
+  };
+  injectPrintStyles();
+  document.addEventListener("keydown", handleKeyDown, { capture: true });
+  window.addEventListener("beforeprint", handleBeforePrint);
+  return {
+    destroy: () => {
+      document.removeEventListener("keydown", handleKeyDown, {
+        capture: true
+      });
+      window.removeEventListener("beforeprint", handleBeforePrint);
+      if (styleEl && styleEl.parentNode) {
+        styleEl.parentNode.removeChild(styleEl);
+      }
+      styleEl = null;
+    }
+  };
+}
+function useOptiGuard(options = {}) {
+  const instanceRef = react.useRef(null);
+  react.useEffect(() => {
+    instanceRef.current = initSecurityProtection(options);
+    return () => {
+      if (instanceRef.current) {
+        stopSecurityProtection();
+        instanceRef.current = null;
+      }
+    };
+  }, [
+    options.enabled,
+    options.disableInDev,
+    options.blockContextMenu,
+    options.blockShortcuts,
+    options.blockPrint,
+    options.privacyBlur,
+    options.idleLock,
+    options.watermark
+  ]);
+  return {
+    getInstance: () => instanceRef.current,
+    triggerLock: (reason) => instanceRef.current?.detector?.trigger(reason),
+    stop: () => stopSecurityProtection()
+  };
+}
+var OptiGuardShield = ({
+  children,
+  ...config
+}) => {
+  useOptiGuard(config);
+  return /* @__PURE__ */ jsxRuntime.jsx(jsxRuntime.Fragment, { children });
+};
+var OptiGuardWatermark = ({
+  children,
+  className,
+  style,
+  ...watermarkConfig
+}) => {
+  const containerRef = react.useRef(null);
+  const watermarkCtrl = react.useRef(null);
+  react.useEffect(() => {
+    if (containerRef.current) {
+      watermarkCtrl.current = setupWatermark({
+        ...watermarkConfig,
+        container: containerRef.current
+      });
+    }
+    return () => {
+      if (watermarkCtrl.current) {
+        watermarkCtrl.current.destroy();
+        watermarkCtrl.current = null;
+      }
+    };
+  }, [
+    typeof watermarkConfig.text === "function" ? null : watermarkConfig.text,
+    watermarkConfig.opacity,
+    watermarkConfig.fontSize,
+    watermarkConfig.color,
+    watermarkConfig.rotate,
+    watermarkConfig.appendTimestamp
+  ]);
+  return /* @__PURE__ */ jsxRuntime.jsx(
+    "div",
+    {
+      ref: containerRef,
+      className,
+      style: { position: "relative", ...style },
+      children
+    }
+  );
+};
+
 // src/index.ts
-var activeController = null;
+var activeInstance = null;
 var activeShortcutsCleanup = null;
 function initSecurityProtection(options = {}) {
   if (typeof window === "undefined") return null;
@@ -529,6 +1333,10 @@ function initSecurityProtection(options = {}) {
     branding: {
       ...globalConfig.branding || {},
       ...options.branding || {}
+    },
+    contentProtection: {
+      ...globalConfig.contentProtection || {},
+      ...options.contentProtection || {}
     }
   };
   const isEnabled = mergedConfig.enabled !== void 0 ? mergedConfig.enabled : true;
@@ -540,19 +1348,65 @@ function initSecurityProtection(options = {}) {
     return null;
   }
   stopSecurityProtection();
+  const telemetry = setupTelemetry(mergedConfig.telemetry);
   const blockContextMenu = mergedConfig.blockContextMenu !== void 0 ? mergedConfig.blockContextMenu : true;
   const blockShortcuts = mergedConfig.blockShortcuts !== void 0 ? mergedConfig.blockShortcuts : true;
   activeShortcutsCleanup = setupShortcutsBlocker({
     blockContextMenu,
-    blockShortcuts
+    blockShortcuts,
+    contentProtection: mergedConfig.contentProtection,
+    onBlocked: (reason, details) => {
+      telemetry.report({
+        type: reason === "contextmenu_blocked" ? "contextmenu_blocked" : "shortcut_blocked",
+        reason,
+        details
+      });
+    }
   });
-  activeController = setupSecurityDetector(mergedConfig);
-  return activeController;
+  let printController = null;
+  if (mergedConfig.blockPrint) {
+    printController = setupPrintBlocker(mergedConfig.blockPrint, () => {
+      telemetry.report({
+        type: "print_blocked",
+        reason: "print_attempted"
+      });
+    });
+  }
+  let watermarkController = null;
+  if (mergedConfig.watermark) {
+    watermarkController = setupWatermark(mergedConfig.watermark);
+  }
+  let privacyController = null;
+  if (mergedConfig.privacyBlur) {
+    privacyController = setupPrivacyBlur(mergedConfig.privacyBlur);
+  }
+  let idleController = null;
+  if (mergedConfig.idleLock) {
+    idleController = setupIdleLock(mergedConfig.idleLock, mergedConfig);
+  }
+  const detectorController = setupSecurityDetector(mergedConfig);
+  const instance = {
+    detector: detectorController,
+    watermark: watermarkController,
+    privacy: privacyController,
+    idle: idleController,
+    print: printController,
+    telemetry,
+    stop: () => stopSecurityProtection(),
+    trigger: (reason) => detectorController.trigger(reason)
+  };
+  activeInstance = instance;
+  window.__OPTIGUARD_INSTANCE__ = instance;
+  return instance;
 }
 function stopSecurityProtection() {
-  if (activeController) {
-    activeController.stop();
-    activeController = null;
+  if (activeInstance) {
+    if (activeInstance.detector) activeInstance.detector.stop();
+    if (activeInstance.watermark) activeInstance.watermark.destroy();
+    if (activeInstance.privacy) activeInstance.privacy.destroy();
+    if (activeInstance.idle) activeInstance.idle.destroy();
+    if (activeInstance.print) activeInstance.print.destroy();
+    activeInstance = null;
   }
   if (activeShortcutsCleanup) {
     activeShortcutsCleanup();
@@ -562,14 +1416,23 @@ function stopSecurityProtection() {
 var index_default = initSecurityProtection;
 
 exports.DEFAULT_OPTIGUARD_LOGO = DEFAULT_OPTIGUARD_LOGO;
+exports.OptiGuardShield = OptiGuardShield;
+exports.OptiGuardWatermark = OptiGuardWatermark;
 exports.closeLockScreen = closeLockScreen;
 exports.default = index_default;
 exports.initSecurityProtection = initSecurityProtection;
 exports.isLocalEnvironment = isLocalEnvironment;
 exports.isRealMobileDevice = isRealMobileDevice;
 exports.renderLockScreen = renderLockScreen;
+exports.setupIdleLock = setupIdleLock;
+exports.setupPrintBlocker = setupPrintBlocker;
+exports.setupPrivacyBlur = setupPrivacyBlur;
 exports.setupSecurityDetector = setupSecurityDetector;
 exports.setupShortcutsBlocker = setupShortcutsBlocker;
+exports.setupTelemetry = setupTelemetry;
+exports.setupWatermark = setupWatermark;
 exports.stopSecurityProtection = stopSecurityProtection;
+exports.useOptiGuard = useOptiGuard;
+exports.wipeStorage = wipeStorage;
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

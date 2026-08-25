@@ -1,6 +1,8 @@
 import * as devtoolsDetector from 'devtools-detector';
 import { SecurityConfig } from './types';
 import { renderLockScreen } from './ui';
+import { wipeStorage } from './storage';
+import { setupTelemetry } from './telemetry';
 
 export interface SecurityController {
   stop: () => void;
@@ -15,7 +17,6 @@ export function isLocalEnvironment(): boolean {
     window.location.hostname
   );
 
-  // Checks Vite / standard dev flags safely
   const isDevMeta =
     typeof import.meta !== 'undefined' &&
     (import.meta as any).env &&
@@ -37,9 +38,17 @@ export function setupSecurityDetector(
   let intervalId: any = null;
   const eventCleanups: Array<() => void> = [];
 
+  const telemetry = setupTelemetry(config.telemetry);
+
   const triggerAction = (reason = 'devtools_detected') => {
     if (isTriggered) return;
     isTriggered = true;
+
+    // Report incident
+    telemetry.report({
+      type: 'devtools_opened',
+      reason,
+    });
 
     // Call custom onDetect callback first if provided
     if (typeof config.onDetect === 'function') {
@@ -53,10 +62,15 @@ export function setupSecurityDetector(
       devtoolsDetector.stop();
     } catch {}
 
-    try {
-      localStorage.removeItem('portal_notifications');
-      localStorage.removeItem('portal_notif_user_id');
-    } catch {}
+    // Storage wiping on security breach
+    if (config.wipeStorageOnDetect) {
+      wipeStorage(config.wipeStorageOnDetect);
+    } else {
+      try {
+        localStorage.removeItem('portal_notifications');
+        localStorage.removeItem('portal_notif_user_id');
+      } catch {}
+    }
 
     const redirectBehavior = config.redirectBehavior || 'logout';
 

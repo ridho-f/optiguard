@@ -1,7 +1,8 @@
 # @ridhof_1/optiguard-security 🛡️
 
-Enterprise-grade frontend security shield: **Anti-DevTools**, **Anti-Debugger**, **Keyboard & Context Menu Blocker**, dan customizable **OptiGuard Lock Screen** untuk aplikasi Web & SPA (React, Next.js, Vue, Inertia.js, Vite, dan Vanilla JS).
+Enterprise-grade frontend security shield: **Anti-DevTools**, **Anti-Debugger**, **Forensic Watermarking**, **Tab-Switch Privacy Shield**, **Inactivity Auto-Lock**, **Anti-Print**, **Content Protection**, **Security Incident Telemetry**, dan customizable **OptiGuard Lock Screen** untuk aplikasi Web & SPA (React, Next.js, Vue, Inertia.js, Vite, dan Vanilla JS).
 
+[![GitHub Repository](https://img.shields.io/badge/GitHub-ridho--f%2Foptiguard-181717.svg?logo=github)](https://github.com/ridho-f/optiguard)
 [![NPM Version](https://img.shields.io/npm/v/@ridhof_1/optiguard-security.svg?color=3b82f6)](https://www.npmjs.com/package/@ridhof_1/optiguard-security)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
@@ -13,349 +14,260 @@ Enterprise-grade frontend security shield: **Anti-DevTools**, **Anti-Debugger**,
 - [Fitur Utama](#-fitur-utama)
 - [Instalasi](#-instalasi)
 - [Panduan Penggunaan Cepat (Quick Start)](#-panduan-penggunaan-cepat-quick-start)
-- [Contoh Integrasi Framework](#-contoh-integrasi-framework)
-  - [1. React / Vite SPA](#1-react--vite-spa)
-  - [2. Laravel + Inertia.js (React / Vue)](#2-laravel--inertiajs-react--vue)
-  - [3. Next.js (App Router & Pages Router)](#3-nextjs)
-  - [4. Vanilla JavaScript / HTML Biasa](#4-vanilla-javascript--html-biasa)
-  - [5. Laravel Blade Template (Backend Config)](#5-laravel-blade-template-backend-config)
-- [Kustomisasi Lock Screen](#-kustomisasi-lock-screen)
-- [Konfigurasi Lengkap (Options API)](#-konfigurasi-lengkap-options-api)
-- [Fungsi & Helper Tambahan](#-fungsi--helper-tambahan)
-- [Cara Menghentikan Proteksi (Cleanup)](#-cara-menghentikan-proteksi-cleanup)
-- [Build & Publish ke NPM](#-build--publish-ke-npm)
+- [Fitur Lanjutan & Konfigurasi](#-fitur-lanjutan--konfigurasi)
+  - [1. Dynamic Forensic Watermark](#1-dynamic-forensic-watermark)
+  - [2. Tab-Switch Privacy Shield (Anti-Peeking)](#2-tab-switch-privacy-shield-anti-peeking)
+  - [3. Inactivity & Idle Auto-Lock](#3-inactivity--idle-auto-lock)
+  - [4. Anti-Print & Anti-Save PDF](#4-anti-print--anti-save-pdf)
+  - [5. Content Protection (Copy, Cut, Drag, Selection)](#5-content-protection-copy-cut-drag-selection)
+  - [6. Security Incident Telemetry & Webhooks](#6-security-incident-telemetry--webhooks)
+  - [7. Storage Wiper on Breach](#7-storage-wiper-on-breach)
+- [Integrasi React (Component & Hook)](#-integrasi-react-component--hook)
+- [Konfigurasi Lengkap (Full Options API)](#-konfigurasi-lengkap-full-options-api)
 - [Lisensi](#-lisensi)
 
 ---
 
 ## ✨ Fitur Utama
 
-- 🔍 **Real-time DevTools & Inspector Detection**: Mendeteksi pembukaan console (docked/undocked), inspect element, debugger trap, dan perubahan ukuran window inspector secara presisi.
-- 🚫 **Keyboard Shortcut Blocker**: Memblokir shortcut developer seperti `F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+C`, `Ctrl+U` (view-source), dan `Ctrl+S`.
-- 🖱️ **Context Menu Blocker**: Mencegah klik kanan untuk mematikan menu context inspect element bawaan browser.
-- 🔒 **Customizable Lock Screen**: Dialog modal keamanan modern (Glassmorphism dark-mode) dengan animasi proteksi, pesan peringatan, custom logo, dan tombol navigasi/logout.
-- ⚙️ **Fleksibilitas Aksi Redirect**: Pilihan aksi otomatis saat terdeteksi (`logout`, `back`, `google`, `home`, `blank`, atau custom URL).
-- 📱 **Mobile & Touch Friendly**: Proteksi pintar yang aman dari false-positive debugger pada browser mobile (Android/iOS).
-- 🛡️ **Dev-Safe Mode**: Otomatis nonaktif di lingkungan development (`localhost`, `127.0.0.1`, Vite dev) sehingga tidak mengganggu saat coding.
+- 🔍 **Real-time DevTools & Inspector Detection**: Mendeteksi pembukaan console (docked/undocked), inspect element, debugger trap, dan console sniffing secara presisi.
+- 💧 **Dynamic Forensic Watermark**: Menghasilkan watermark dinamis transparan (Email, IP, Timestamp, Nama User) dengan proteksi anti-tamper MutationObserver.
+- 👁️ **Tab-Switch Privacy Shield**: Otomatis mem-blur layar dan memunculkan barrier anti-peeking saat pengguna berpindah tab / minimize window.
+- ⏱️ **Inactivity & Idle Auto-Lock**: Mengunci layar atau logout otomatis saat pengguna tidak melakukan aktivitas (mouse/keyboard/scroll) selama waktu yang ditentukan.
+- 🖨️ **Anti-Print & PDF Blocker**: Memblokir shortcut `Ctrl+P`/`Cmd+P` dan mematikan tampilan dokumen pada mode print preview.
+- 📋 **Content Copy & Selection Blocker**: Mencegah copy-paste, cut, drag-and-drop, dan text selection pada data sensitif.
+- 🚨 **Incident Telemetry & Webhooks**: Mengirimkan laporan insiden keamanan ke backend API / Webhook saat ada upaya manipulasi.
+- 🧹 **Storage Wiper on Breach**: Otomatis menghapus `localStorage`, `sessionStorage`, atau cookies saat terjadi pelanggaran keamanan sebelum redirect.
+- 🔒 **Modern Lock Screen Dialog**: Tampilan glassmorphism dark-mode beranimasi dengan custom branding dan logo.
+- ⚛️ **React Support**: Dilengkapi hook `useOptiGuard` dan komponen `<OptiGuardShield>`, `<OptiGuardWatermark>`.
 
 ---
 
 ## 📦 Instalasi
 
-Install melalui package manager favorit Anda:
-
 ```bash
-# npm
+# Melalui GitHub Repository langsung:
+npm install github:ridho-f/optiguard
+
+# Atau melalui package NPM:
 npm install @ridhof_1/optiguard-security
-
-# yarn
-yarn add @ridhof_1/optiguard-security
-
-# pnpm
-pnpm add @ridhof_1/optiguard-security
 ```
 
 ---
 
 ## 🚀 Panduan Penggunaan Cepat (Quick Start)
 
-Cukup import dan panggil `initSecurityProtection()` pada file entry point aplikasi Anda:
+### 1. Inisialisasi Paling Sederhana (JavaScript / TypeScript)
 
 ```typescript
 import { initSecurityProtection } from '@ridhof_1/optiguard-security';
 
-// Inisialisasi proteksi dengan konfigurasi default
-initSecurityProtection();
+// Aktifkan semua proteksi standar
+initSecurityProtection({
+  disableInDev: true, // Nonaktif di localhost saat coding
+  redirectBehavior: 'logout',
+  watermark: {
+    text: ['PT Tata Optima Property', 'user@domain.com'],
+    appendTimestamp: true,
+  },
+  privacyBlur: true,
+  blockPrint: true,
+});
 ```
-
-> 💡 **Info:** Secara default `disableInDev: true`, sehingga proteksi akan nonaktif di `localhost` atau `127.0.0.1`. Jika Anda ingin menguji di localhost, atur `disableInDev: false`.
 
 ---
 
-## 💻 Contoh Integrasi Framework
+## 🛡️ Fitur Lanjutan & Konfigurasi
 
-### 1. React / Vite SPA
+### 1. Dynamic Forensic Watermark
 
-Di `src/main.tsx` atau `src/App.tsx`:
+Menambahkan overlay watermark semi-transparan untuk pelacakan forensik foto layar:
+
+```typescript
+initSecurityProtection({
+  watermark: {
+    text: ['John Doe (NIK: 884920)', 'IP: 182.253.110.22', 'CONFIDENTIAL'],
+    opacity: 0.08,
+    fontSize: 14,
+    rotate: -25,
+    gap: [200, 100],
+    appendTimestamp: true, // Otomatis menambahkan tanggal & jam real-time
+    antiTamper: true,      // Otomatis recreate jika dihapus lewat DevTools
+  },
+});
+```
+
+### 2. Tab-Switch Privacy Shield (Anti-Peeking)
+
+Menutup tampilan layar saat user membuka tab lain:
+
+```typescript
+initSecurityProtection({
+  privacyBlur: {
+    enabled: true,
+    blurAmount: '16px',
+    overlayTitle: 'OptiGuard Privacy Shield',
+    overlaySubtitle: 'Tampilan disembunyikan untuk menjaga kerahasiaan data.',
+    unblurOnFocus: true, // Otomatis kembali normal saat tab dibuka lagi
+  },
+});
+```
+
+### 3. Inactivity & Idle Auto-Lock
+
+Mengunci aplikasi jika user tidak menyentuh mouse/keyboard selama 5 menit:
+
+```typescript
+initSecurityProtection({
+  idleLock: {
+    enabled: true,
+    timeout: 5 * 60 * 1000, // 5 menit
+    action: 'lockscreen',    // 'lockscreen' | 'logout' | 'redirect' | custom callback
+    warnBeforeSeconds: 30,
+    onWarning: (secondsLeft) => {
+      console.warn(`Sesi akan terkunci dalam ${secondsLeft} detik`);
+    },
+  },
+});
+```
+
+### 4. Anti-Print & Anti-Save PDF
+
+```typescript
+initSecurityProtection({
+  blockPrint: {
+    enabled: true,
+    hideContent: true,
+    printMessage: 'DOKUMEN DILINDUNGI: Dilarang mencetak atau menyimpan dokumen ini.',
+  },
+});
+```
+
+### 5. Content Protection (Copy, Cut, Drag, Selection)
+
+```typescript
+initSecurityProtection({
+  contentProtection: {
+    blockCopy: true,          // Blokir Ctrl+C & Copy context
+    blockCut: true,           // Blokir Ctrl+X
+    blockDragDrop: true,      // Blokir Drag gambar / teks
+    blockTextSelection: true, // user-select: none
+  },
+});
+```
+
+### 6. Security Incident Telemetry & Webhooks
+
+Otomatis mengirim payload telemetry ke endpoint backend atau webhook Slack/Discord:
+
+```typescript
+initSecurityProtection({
+  telemetry: {
+    endpoint: '/api/security/incidents',
+    headers: {
+      'X-CSRF-TOKEN': '...',
+    },
+    metadata: () => ({
+      userId: 123,
+      role: 'Finance Admin',
+    }),
+    onIncident: (incident) => {
+      console.warn('Security Incident Detected:', incident);
+    },
+  },
+});
+```
+
+### 7. Storage Wiper on Breach
+
+Membersihkan token di `localStorage` & `sessionStorage` saat ada hacker/user membuka Inspect Element:
+
+```typescript
+initSecurityProtection({
+  wipeStorageOnDetect: {
+    localStorage: true,
+    sessionStorage: true,
+    cookies: ['auth_session', 'jwt_token'],
+  },
+});
+```
+
+---
+
+## ⚛️ Integrasi React (Component & Hook)
+
+Tersedia import khusus untuk ekosistem React:
 
 ```tsx
 import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import { initSecurityProtection } from '@ridhof_1/optiguard-security';
-
-// Jalankan sebelum / saat render aplikasi
-initSecurityProtection({
-  disableInDev: false, // Set true di production
-  redirectBehavior: 'logout',
-  redirectUrl: '/login',
-  branding: {
-    title: 'Akses Pengembang Dibatasi',
-    message: 'Aplikasi ini dilindungi oleh OptiGuard Security System.',
-    badgeText: 'Security Shield Active',
-    footerText: 'PT Tata Optima Property',
-    buttonText: 'Kembali ke Beranda',
-    buttonUrl: '/',
-  },
-});
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-```
-
----
-
-### 2. Laravel + Inertia.js (React / Vue)
-
-Buat helper wrapper di `resources/js/lib/security.ts` untuk mendengarkan navigasi halaman Inertia:
-
-```typescript
-// resources/js/lib/security.ts
-import { router } from '@inertiajs/react';
 import {
-  initSecurityProtection as baseInitSecurityProtection,
-  SecurityConfig,
-  SecurityController,
-} from '@ridhof_1/optiguard-security';
+  OptiGuardShield,
+  OptiGuardWatermark,
+  useOptiGuard
+} from '@ridhof_1/optiguard-security/react';
 
-export function initSecurityProtection(options: SecurityConfig = {}): SecurityController | null {
-  return baseInitSecurityProtection({
-    ...options,
-    onRouteChanged: (checkCallback: () => void) => {
-      try {
-        router.on('navigate', checkCallback);
-        router.on('finish', checkCallback);
-      } catch {
-        // Router belum siap
-      }
-    },
+export function App() {
+  // Opsi 1: Menggunakan Hook
+  const { triggerLock } = useOptiGuard({
+    watermark: { text: 'INTERNAL USE ONLY' },
+    privacyBlur: true,
   });
-}
-
-export { stopSecurityProtection } from '@ridhof_1/optiguard-security';
-```
-
-Lalu panggil di `resources/js/app.tsx`:
-
-```tsx
-// resources/js/app.tsx
-import { initSecurityProtection } from './lib/security';
-
-initSecurityProtection();
-```
-
----
-
-### 3. Next.js
-
-#### **Next.js App Router (`app/layout.tsx`)**:
-
-```tsx
-'use client';
-
-import { useEffect } from 'react';
-import { initSecurityProtection, stopSecurityProtection } from '@ridhof_1/optiguard-security';
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    const controller = initSecurityProtection({
-      disableInDev: process.env.NODE_ENV === 'development',
-      redirectBehavior: 'logout',
-      redirectUrl: '/login',
-    });
-
-    return () => {
-      stopSecurityProtection();
-    };
-  }, []);
 
   return (
-    <html lang="id">
-      <body>{children}</body>
-    </html>
+    // Opsi 2: Menggunakan Component Shield
+    <OptiGuardShield
+      disableInDev={true}
+      privacyBlur={true}
+      idleLock={{ enabled: true, timeout: 300000 }}
+    >
+      <div className="container">
+        <h1>Financial Dashboard</h1>
+
+        {/* Opsi 3: Watermark hanya pada area sensitif */}
+        <OptiGuardWatermark text="CONFIDENTIAL SALARY DATA">
+          <table className="salary-table">
+            {/* Tabel Data Gaji */}
+          </table>
+        </OptiGuardWatermark>
+      </div>
+    </OptiGuardShield>
   );
 }
 ```
 
 ---
 
-### 4. Vanilla JavaScript / HTML Biasa
-
-Gunakan di script browser standar:
-
-```html
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <title>Portal Web</title>
-</head>
-<body>
-  <h1>Selamat Datang</h1>
-
-  <!-- Jika menggunakan bundling (Webpack/Vite/Rollup) -->
-  <script type="module">
-    import { initSecurityProtection } from '@ridhof_1/optiguard-security';
-
-    initSecurityProtection({
-      disableInDev: false,
-      blockContextMenu: true,
-      blockShortcuts: true,
-      redirectBehavior: 'logout',
-    });
-  </script>
-</body>
-</html>
-```
-
----
-
-### 5. Laravel Blade Template (Backend Config)
-
-Anda dapat menyuntikkan konfigurasi langsung dari file Blade `resources/views/app.blade.php` sebelum bundle JS dijalankan:
-
-```blade
-<!DOCTYPE html>
-<html>
-<head>
-    <!-- Konfigurasi Global OptiGuard Security -->
-    <script>
-        window.__SECURITY_CONFIG__ = {
-            enabled: @json(config('security.enabled', true)),
-            disableInDev: @json(app()->isLocal()),
-            redirectBehavior: 'logout',
-            redirectUrl: '/login',
-            blockContextMenu: true,
-            blockShortcuts: true,
-            branding: {
-                title: 'Akses Pengembang Dibatasi',
-                badgeText: 'OptiGuard Protection',
-                footerText: 'PT Tata Optima Property'
-            }
-        };
-    </script>
-
-    @viteReactRefresh
-    @vite(['resources/js/app.tsx'])
-</head>
-<body>
-    @inertia
-</body>
-</html>
-```
-
----
-
-## 🎨 Kustomisasi Lock Screen
-
-Saat DevTools terdeteksi, modal Lock Screen dengan gaya gelap futuristik akan otomatis muncul. Anda dapat mengkustomisasi setiap bagian teks, logo, maupun aksi tombol:
+## 🛠️ Konfigurasi Lengkap (Full Options API)
 
 ```typescript
-initSecurityProtection({
-  branding: {
-    title: 'Akses Pengembang Dibatasi',
-    message: 'Inspeksi source code dan penggunaan developer tools dilarang pada sistem ini.',
-    badgeText: 'Security Protocol Level 1',
-    footerText: 'PT Tata Optima Property • Security Protocol',
-    logoUrl: '/storage/OptiGuard.png', // URL gambar logo kustom
-    buttonText: 'Keluar & Kembali ke Login',
-    buttonUrl: '/login',
-  }
-});
-```
+interface SecurityConfig {
+  enabled?: boolean;                           // Default: true
+  disableInDev?: boolean;                      // Default: true
+  redirectBehavior?: 'logout' | 'back' | 'google' | 'home' | 'blank' | string;
+  redirectUrl?: string;                        // Default: '/login'
+  blockContextMenu?: boolean;                  // Default: true
+  blockShortcuts?: boolean;                    // Default: true
+  detectDelay?: number;                        // Default: 200
+  checkInterval?: number;                      // Default: 300
 
----
+  // Fitur Baru v1.1.0:
+  watermark?: boolean | WatermarkConfig;
+  privacyBlur?: boolean | PrivacyBlurConfig;
+  idleLock?: boolean | IdleLockConfig;
+  blockPrint?: boolean | PrintBlockConfig;
+  contentProtection?: ContentProtectionConfig;
+  telemetry?: string | TelemetryConfig;
+  wipeStorageOnDetect?: boolean | StorageWipeConfig;
 
-## ⚙️ Konfigurasi Lengkap (Options API)
-
-Objek `SecurityConfig` mendukung parameter berikut:
-
-| Parameter | Tipe Data | Default | Keterangan |
-| :--- | :--- | :--- | :--- |
-| `enabled` | `boolean` | `true` | Mengaktifkan atau menonaktifkan seluruh sistem proteksi. |
-| `disableInDev` | `boolean` | `true` | Jika `true`, otomatis nonaktif di `localhost`, `127.0.0.1`, dan mode dev. |
-| `redirectBehavior` | `string` | `'logout'` | Tindakan saat inspeksi terdeteksi:<br>• `'logout'`: Munculkan Lock Screen & opsi redirect.<br>• `'back'`: Kembali ke riwayat halaman sebelumnya.<br>• `'google'`: Alihkan ke Google.<br>• `'home'`: Alihkan ke root `/`.<br>• `'blank'`: Buka `about:blank`.<br>• `'/custom-path'`: Alihkan ke URL spesifik. |
-| `redirectUrl` | `string` | `'/login'` | URL tujuan jika `redirectBehavior` bernilai `'logout'` atau custom path. |
-| `blockContextMenu` | `boolean` | `true` | Memblokir klik kanan (*Right Click Context Menu*). |
-| `blockShortcuts` | `boolean` | `true` | Memblokir tombol `F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+C`, `Ctrl+U`, `Ctrl+S`. |
-| `detectDelay` | `number` | `200` | Delay waktu polling detektor DevTools (milidetik). |
-| `checkInterval` | `number` | `300` | Interval pemeriksaan rutin DevTools (milidetik). |
-| `branding` | `SecurityBrandingConfig` | `{}` | Objek kustomisasi teks, logo, dan tombol pada Lock Screen modal. |
-| `onDetect` | `(details) => boolean \| void` | `undefined` | Callback custom saat DevTools terdeteksi. Return `false` jika ingin membatalkan aksi redirect default. |
-| `onRouteChanged` | `(cb) => () => void` | `undefined` | Listener hook router (seperti Inertia router, Vue Router, dsb). |
-
----
-
-## 🛠️ Fungsi & Helper Tambahan
-
-Package ini juga mengekspor berbagai helper modular:
-
-```typescript
-import {
-  initSecurityProtection,
-  stopSecurityProtection,
-  renderLockScreen,
-  setupSecurityDetector,
-  setupShortcutsBlocker,
-  isLocalEnvironment,
-  isRealMobileDevice,
-} from '@ridhof_1/optiguard-security';
-
-// Cek apakah berjalan di lingkungan localhost
-if (isLocalEnvironment()) {
-  console.log('Running locally');
+  // Custom UI & Callbacks:
+  branding?: SecurityBrandingConfig;
+  onDetect?: (details?: { reason?: string }) => boolean | void;
+  onRouteChanged?: (callback: () => void) => (() => void) | void;
 }
-
-// Cek apakah perangkat adalah mobile device asli
-if (isRealMobileDevice()) {
-  console.log('Mobile device detected');
-}
-
-// Tampilkan Lock Screen secara manual jika dibutuhkan
-renderLockScreen({
-  branding: {
-    title: 'Sesi Terkunci',
-  }
-});
-```
-
----
-
-## 🛑 Cara Menghentikan Proteksi (Cleanup)
-
-Untuk menghentikan semua listener shortcut dan loop pemeriksaan DevTools (misalnya saat component unmount):
-
-```typescript
-import { stopSecurityProtection } from '@ridhof_1/optiguard-security';
-
-stopSecurityProtection();
-```
-
----
-
-## 🚀 Build & Publish ke NPM
-
-Jika Anda ingin mengompilasi dan mem-publish versi terbaru package ini:
-
-```bash
-# 1. Masuk ke direktori package
-cd packages/optiguard-security
-
-# 2. Build TypeScript & Bundle via tsup
-npm run build
-
-# 3. Login ke akun NPM (jika belum)
-npm login
-
-# 4. Publish ke NPM publik
-npm publish --access public
 ```
 
 ---
 
 ## 📄 Lisensi
 
-Didistribusikan di bawah Lisensi MIT. Hak Cipta © **PT Tata Optima Property**.
+Distributed under the **MIT License**. Created & Maintained by **PT Tata Optima Property** & [ridho-f](https://github.com/ridho-f).
