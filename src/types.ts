@@ -68,12 +68,18 @@ export interface WatermarkConfig {
 export interface PrivacyBlurConfig {
   /** Enable or disable privacy blur on tab switch. Default: true */
   enabled?: boolean;
-  /** CSS filter blur intensity (e.g. '12px', '20px'). Default: '15px' */
+  /** CSS filter blur intensity (e.g. '12px', '20px'). Default: '16px' */
   blurAmount?: string;
   /** Floating overlay badge/title text when blurred. Default: "OptiGuard Privacy Shield" */
   overlayTitle?: string;
-  /** Subtitle message text when blurred. Default: "Tampilan disembunyikan untuk menjaga kerahasiaan data." */
+  /** Subtitle message text when blurred. Default: "Tampilan disembunyikan untuk menjaga kerahasiaan data portal." */
   overlaySubtitle?: string;
+  /** Badge text label above the title. Default: "OptiGuard Privacy Protocol" */
+  badgeText?: string;
+  /** Organization footer text. Default: "OptiGuard Security Protocol • PT Tata Optima Property" */
+  footerText?: string;
+  /** Brand Logo image URL. If null or false, logo is hidden. If undefined, built-in vector logo is shown. */
+  logoUrl?: string | null | false;
   /** Show dark translucent backdrop overlay on top of blur. Default: true */
   showBackdrop?: boolean;
   /** Automatically unblur and reveal screen when window regains focus. Default: true */
