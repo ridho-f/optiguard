@@ -125,8 +125,31 @@ export function setupShortcutsBlocker(
     });
   }
 
-  // 6. Block Text Selection via CSS
+  // 6. Block Text Selection via CSS & selectstart Event
   if (content.blockTextSelection) {
+    const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      return false;
+    };
+
+    document.addEventListener('selectstart', handleSelectStart, {
+      capture: true,
+    });
+    cleanups.push(() => {
+      document.removeEventListener('selectstart', handleSelectStart, {
+        capture: true,
+      });
+    });
+
     const style = document.createElement('style');
     style.id = 'optiguard-selection-styles';
     style.textContent = `
@@ -136,7 +159,7 @@ export function setupShortcutsBlocker(
         -ms-user-select: none !important;
         user-select: none !important;
       }
-      input, textarea {
+      input, textarea, [contenteditable="true"] {
         -webkit-user-select: text !important;
         -moz-user-select: text !important;
         -ms-user-select: text !important;

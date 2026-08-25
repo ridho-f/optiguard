@@ -191,6 +191,18 @@ export interface SecurityConfig {
   /** Prevent keyboard shortcuts like F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C, Ctrl+U, Ctrl+S. Default: true */
   blockShortcuts?: boolean;
 
+  /** Prevent text selection (user-select: none & selectstart block). Default: true */
+  blockTextSelection?: boolean;
+
+  /** Prevent copying content (Ctrl+C, Cmd+C). Default: true */
+  blockCopy?: boolean;
+
+  /** Prevent cutting content (Ctrl+X, Cmd+X). Default: true */
+  blockCut?: boolean;
+
+  /** Prevent dragging images, links, or text selections. Default: true */
+  blockDragDrop?: boolean;
+
   /** Content copy & selection protection options. */
   contentProtection?: ContentProtectionConfig;
 

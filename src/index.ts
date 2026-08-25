@@ -96,13 +96,54 @@ export function initSecurityProtection(
       ? mergedConfig.blockShortcuts
       : true;
 
+  // Resolve content protection with top-level shortcuts and default true
+  const rawContent = mergedConfig.contentProtection || {};
+  const blockTextSelection =
+    mergedConfig.blockTextSelection !== undefined
+      ? mergedConfig.blockTextSelection
+      : rawContent.blockTextSelection !== undefined
+      ? rawContent.blockTextSelection
+      : true;
+
+  const blockCopy =
+    mergedConfig.blockCopy !== undefined
+      ? mergedConfig.blockCopy
+      : rawContent.blockCopy !== undefined
+      ? rawContent.blockCopy
+      : true;
+
+  const blockCut =
+    mergedConfig.blockCut !== undefined
+      ? mergedConfig.blockCut
+      : rawContent.blockCut !== undefined
+      ? rawContent.blockCut
+      : true;
+
+  const blockDragDrop =
+    mergedConfig.blockDragDrop !== undefined
+      ? mergedConfig.blockDragDrop
+      : rawContent.blockDragDrop !== undefined
+      ? rawContent.blockDragDrop
+      : true;
+
   activeShortcutsCleanup = setupShortcutsBlocker({
     blockContextMenu,
     blockShortcuts,
-    contentProtection: mergedConfig.contentProtection,
+    contentProtection: {
+      blockTextSelection,
+      blockCopy,
+      blockCut,
+      blockDragDrop,
+      ...rawContent,
+    },
     onBlocked: (reason, details) => {
       telemetry.report({
-        type: reason === 'contextmenu_blocked' ? 'contextmenu_blocked' : 'shortcut_blocked',
+        type:
+          reason === 'contextmenu_blocked'
+            ? 'contextmenu_blocked'
+            : reason === 'copy_blocked'
+            ? 'copy_blocked'
+            : 'shortcut_blocked',
         reason,
         details,
       });

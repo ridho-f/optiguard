@@ -659,6 +659,22 @@ function setupShortcutsBlocker(options) {
     });
   }
   if (content.blockTextSelection) {
+    const handleSelectStart = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      return false;
+    };
+    document.addEventListener("selectstart", handleSelectStart, {
+      capture: true
+    });
+    cleanups.push(() => {
+      document.removeEventListener("selectstart", handleSelectStart, {
+        capture: true
+      });
+    });
     const style = document.createElement("style");
     style.id = "optiguard-selection-styles";
     style.textContent = `
@@ -668,7 +684,7 @@ function setupShortcutsBlocker(options) {
         -ms-user-select: none !important;
         user-select: none !important;
       }
-      input, textarea {
+      input, textarea, [contenteditable="true"] {
         -webkit-user-select: text !important;
         -moz-user-select: text !important;
         -ms-user-select: text !important;
@@ -1326,13 +1342,24 @@ function initSecurityProtection(options = {}) {
   const telemetry = setupTelemetry(mergedConfig.telemetry);
   const blockContextMenu = mergedConfig.blockContextMenu !== void 0 ? mergedConfig.blockContextMenu : true;
   const blockShortcuts = mergedConfig.blockShortcuts !== void 0 ? mergedConfig.blockShortcuts : true;
+  const rawContent = mergedConfig.contentProtection || {};
+  const blockTextSelection = mergedConfig.blockTextSelection !== void 0 ? mergedConfig.blockTextSelection : rawContent.blockTextSelection !== void 0 ? rawContent.blockTextSelection : true;
+  const blockCopy = mergedConfig.blockCopy !== void 0 ? mergedConfig.blockCopy : rawContent.blockCopy !== void 0 ? rawContent.blockCopy : true;
+  const blockCut = mergedConfig.blockCut !== void 0 ? mergedConfig.blockCut : rawContent.blockCut !== void 0 ? rawContent.blockCut : true;
+  const blockDragDrop = mergedConfig.blockDragDrop !== void 0 ? mergedConfig.blockDragDrop : rawContent.blockDragDrop !== void 0 ? rawContent.blockDragDrop : true;
   activeShortcutsCleanup = setupShortcutsBlocker({
     blockContextMenu,
     blockShortcuts,
-    contentProtection: mergedConfig.contentProtection,
+    contentProtection: {
+      blockTextSelection,
+      blockCopy,
+      blockCut,
+      blockDragDrop,
+      ...rawContent
+    },
     onBlocked: (reason, details) => {
       telemetry.report({
-        type: reason === "contextmenu_blocked" ? "contextmenu_blocked" : "shortcut_blocked",
+        type: reason === "contextmenu_blocked" ? "contextmenu_blocked" : reason === "copy_blocked" ? "copy_blocked" : "shortcut_blocked",
         reason,
         details
       });
