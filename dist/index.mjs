@@ -710,7 +710,9 @@ function setupShortcutsBlocker(options) {
 
 // src/watermark.ts
 function setupWatermark(options) {
-  if (typeof document === "undefined" || !options) return null;
+  if (typeof window === "undefined" || typeof document === "undefined" || !options) {
+    return null;
+  }
   let currentConfig = typeof options === "boolean" ? { text: "CONFIDENTIAL \u2022 PROTECTED" } : { ...options };
   let containerEl = null;
   let watermarkEl = null;
@@ -725,17 +727,19 @@ function setupWatermark(options) {
     } else if (currentConfig.container instanceof HTMLElement) {
       return currentConfig.container;
     }
-    return document.body;
+    return document.body || document.documentElement;
   };
   const generateDataUrl = () => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     if (!ctx) return "";
     const fontSize = currentConfig.fontSize || 14;
-    const fontFamily = currentConfig.fontFamily || "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
-    const color = currentConfig.color || "rgba(0, 0, 0, 0.08)";
+    const fontFamily = currentConfig.fontFamily || 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const isDarkMode = document.documentElement.classList.contains("dark") || document.body?.classList.contains("dark");
+    const defaultColor = isDarkMode ? "rgba(255, 255, 255, 0.85)" : "rgba(15, 23, 42, 0.85)";
+    const color = currentConfig.color || defaultColor;
     const rotate = currentConfig.rotate !== void 0 ? currentConfig.rotate : -25;
-    const [gapX, gapY] = currentConfig.gap || [220, 120];
+    const [gapX, gapY] = currentConfig.gap || [200, 110];
     let rawText = currentConfig.text;
     if (typeof rawText === "function") {
       rawText = rawText();
@@ -751,16 +755,16 @@ function setupWatermark(options) {
       )}`;
       lines = [...lines, timestampStr];
     }
-    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
     let maxLineWidth = 0;
     lines.forEach((line) => {
       const m = ctx.measureText(line);
       if (m.width > maxLineWidth) maxLineWidth = m.width;
     });
-    const lineHeight = fontSize * 1.4;
+    const lineHeight = fontSize * 1.5;
     const blockHeight = lines.length * lineHeight;
     const width = Math.max(maxLineWidth + gapX, 260);
-    const height = Math.max(blockHeight + gapY, 160);
+    const height = Math.max(blockHeight + gapY, 140);
     canvas.width = width;
     canvas.height = height;
     ctx.font = `600 ${fontSize}px ${fontFamily}`;
@@ -782,14 +786,11 @@ function setupWatermark(options) {
     el.setAttribute("data-optiguard-watermark", "true");
     el.id = "optiguard-watermark-overlay";
     const bgUrl = generateDataUrl();
-    const opacity = currentConfig.opacity !== void 0 ? currentConfig.opacity : 0.85;
+    const opacity = currentConfig.opacity !== void 0 ? currentConfig.opacity : 0.12;
     const zIndex = currentConfig.zIndex !== void 0 ? currentConfig.zIndex : 9999;
     el.style.cssText = `
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
+      inset: 0 !important;
       width: 100vw !important;
       height: 100vh !important;
       pointer-events: none !important;
@@ -807,7 +808,16 @@ function setupWatermark(options) {
   const attach = () => {
     if (isDestroyed) return;
     containerEl = getContainer();
-    if (!containerEl) return;
+    if (!containerEl) {
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => attach(), {
+          once: true
+        });
+      } else {
+        setTimeout(attach, 50);
+      }
+      return;
+    }
     const existing = document.getElementById("optiguard-watermark-overlay");
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);

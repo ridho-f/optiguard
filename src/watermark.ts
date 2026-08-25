@@ -12,7 +12,9 @@ export interface WatermarkController {
 export function setupWatermark(
   options: WatermarkConfig | boolean
 ): WatermarkController | null {
-  if (typeof document === 'undefined' || !options) return null;
+  if (typeof window === 'undefined' || typeof document === 'undefined' || !options) {
+    return null;
+  }
 
   let currentConfig: WatermarkConfig =
     typeof options === 'boolean'
@@ -24,7 +26,7 @@ export function setupWatermark(
   let observer: MutationObserver | null = null;
   let isDestroyed = false;
 
-  const getContainer = (): HTMLElement => {
+  const getContainer = (): HTMLElement | null => {
     if (typeof currentConfig.container === 'string') {
       const el = document.querySelector(
         currentConfig.container
@@ -33,7 +35,7 @@ export function setupWatermark(
     } else if (currentConfig.container instanceof HTMLElement) {
       return currentConfig.container;
     }
-    return document.body;
+    return document.body || document.documentElement;
   };
 
   const generateDataUrl = (): string => {
@@ -44,11 +46,20 @@ export function setupWatermark(
     const fontSize = currentConfig.fontSize || 14;
     const fontFamily =
       currentConfig.fontFamily ||
-      'Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
-    const color = currentConfig.color || 'rgba(0, 0, 0, 0.08)';
+      'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+    // Auto-detect contrast if not explicitly specified
+    const isDarkMode =
+      document.documentElement.classList.contains('dark') ||
+      document.body?.classList.contains('dark');
+    const defaultColor = isDarkMode
+      ? 'rgba(255, 255, 255, 0.85)'
+      : 'rgba(15, 23, 42, 0.85)';
+    const color = currentConfig.color || defaultColor;
+
     const rotate =
       currentConfig.rotate !== undefined ? currentConfig.rotate : -25;
-    const [gapX, gapY] = currentConfig.gap || [220, 120];
+    const [gapX, gapY] = currentConfig.gap || [200, 110];
 
     // Resolve text
     let rawText = currentConfig.text;
@@ -68,23 +79,23 @@ export function setupWatermark(
       lines = [...lines, timestampStr];
     }
 
-    ctx.font = `${fontSize}px ${fontFamily}`;
+    ctx.font = `600 ${fontSize}px ${fontFamily}`;
     let maxLineWidth = 0;
     lines.forEach((line) => {
       const m = ctx.measureText(line);
       if (m.width > maxLineWidth) maxLineWidth = m.width;
     });
 
-    const lineHeight = fontSize * 1.4;
+    const lineHeight = fontSize * 1.5;
     const blockHeight = lines.length * lineHeight;
 
     const width = Math.max(maxLineWidth + gapX, 260);
-    const height = Math.max(blockHeight + gapY, 160);
+    const height = Math.max(blockHeight + gapY, 140);
 
     canvas.width = width;
     canvas.height = height;
 
-    // Reset context properties after dimension change
+    // Reset context properties after canvas resize
     ctx.font = `600 ${fontSize}px ${fontFamily}`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
@@ -111,16 +122,13 @@ export function setupWatermark(
 
     const bgUrl = generateDataUrl();
     const opacity =
-      currentConfig.opacity !== undefined ? currentConfig.opacity : 0.85;
+      currentConfig.opacity !== undefined ? currentConfig.opacity : 0.12;
     const zIndex =
       currentConfig.zIndex !== undefined ? currentConfig.zIndex : 9999;
 
     el.style.cssText = `
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
+      inset: 0 !important;
       width: 100vw !important;
       height: 100vh !important;
       pointer-events: none !important;
@@ -140,7 +148,17 @@ export function setupWatermark(
   const attach = () => {
     if (isDestroyed) return;
     containerEl = getContainer();
-    if (!containerEl) return;
+
+    if (!containerEl) {
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => attach(), {
+          once: true,
+        });
+      } else {
+        setTimeout(attach, 50);
+      }
+      return;
+    }
 
     // Remove existing if any
     const existing = document.getElementById('optiguard-watermark-overlay');
@@ -160,7 +178,6 @@ export function setupWatermark(
         let needsReattach = false;
 
         for (const mutation of mutations) {
-          // If watermark element was removed
           if (mutation.type === 'childList') {
             for (let i = 0; i < mutation.removedNodes.length; i++) {
               const node = mutation.removedNodes[i];
@@ -173,7 +190,6 @@ export function setupWatermark(
               }
             }
           }
-          // If style or attributes were modified via DevTools
           if (
             mutation.type === 'attributes' &&
             mutation.target === watermarkEl
@@ -184,7 +200,6 @@ export function setupWatermark(
         }
 
         if (needsReattach && !isDestroyed) {
-          // Re-attach watermark immediately
           if (observer) observer.disconnect();
           attach();
         }

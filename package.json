@@ -1,6 +1,6 @@
 {
   "name": "@ridhof_1/optiguard-security",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Enterprise-grade frontend security shield: Anti-DevTools, Anti-Debugger, Forensic Watermark, Privacy Shield, Inactivity Auto-Lock, Anti-Print & Shortcuts Blocker for Web & SPA applications.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
